@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QueryCraft AI - SQL Query Optimizer</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Highlight.js for SQL syntax highlighting -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/sql.min.js"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700&display=swap');
+    body {
+      font-family: 'Inter', sans-serif;
+    }
+    .code-font {
+      font-family: 'Fira Code', monospace;
+    }
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #475569;
+    }
+    pre code.hljs {
+      padding: 1rem;
+      border-radius: 0.5rem;
+      background: #090d16;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col">
+
+  <!-- TOP NAVIGATION / HEADER -->
+  <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-4">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-cyan-500 to-emerald-400 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+          <i data-lucide="database-zap" class="w-5 h-5 text-white"></i>
+        </div>
+        <div>
+          <div class="flex items-center space-x-2">
+            <h1 class="text-lg font-bold tracking-tight text-white">QueryCraft <span class="text-cyan-400">AI</span></h1>
+            <span class="text-xs px-2 py-0.5 rounded-full bg-cyan-950 text-cyan-400 border border-cyan-800 font-medium">v1.0 Decoder</span>
+          </div>
+          <p class="text-xs text-slate-400">Deep Learning SQL Optimizer & Architecture Inspector</p>
+        </div>
+      </div>
+
+      <!-- System Health Indicators -->
+      <div class="flex items-center gap-2 text-xs flex-wrap" id="headerBadges">
+        <div class="px-2.5 py-1 rounded-md bg-slate-800/80 border border-slate-700 text-slate-300 flex items-center space-x-1.5">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span>Engine: <strong class="text-slate-100" id="badgeEngine">Transformer + AST</strong></span>
+        </div>
+        <div class="px-2.5 py-1 rounded-md bg-slate-800/80 border border-slate-700 text-slate-300 flex items-center space-x-1.5">
+          <i data-lucide="layers" class="w-3.5 h-3.5 text-cyan-400"></i>
+          <span>Params: <strong class="text-slate-100" id="badgeParams">4.9M</strong></span>
+        </div>
+        <div class="px-2.5 py-1 rounded-md bg-slate-800/80 border border-slate-700 text-slate-300 flex items-center space-x-1.5">
+          <i data-lucide="binary" class="w-3.5 h-3.5 text-indigo-400"></i>
+          <span>Vocab: <strong class="text-slate-100" id="badgeVocab">375 SP</strong></span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN APP CONTAINER -->
+  <main class="max-w-7xl mx-auto px-4 py-6 flex-1 w-full flex flex-col gap-6">
+
+    <!-- PRESET TEMPLATES BAR -->
+    <div class="bg-slate-900/60 border border-slate-800 rounded-xl p-3 flex flex-wrap items-center justify-between gap-3 text-sm">
+      <div class="flex items-center space-x-2 text-slate-400">
+        <i data-lucide="sparkles" class="w-4 h-4 text-amber-400"></i>
+        <span class="text-xs font-semibold uppercase tracking-wider text-slate-300">Quick Test Cases:</span>
+      </div>
+      <div class="flex flex-wrap gap-2">
+        <button onclick="loadPreset('subquery')" class="text-xs px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 hover:border-slate-600 transition flex items-center gap-1.5">
+          <span>Correlated Subquery</span>
+        </button>
+        <button onclick="loadPreset('selectStar')" class="text-xs px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 hover:border-slate-600 transition flex items-center gap-1.5">
+          <span>Unbounded SELECT *</span>
+        </button>
+        <button onclick="loadPreset('wildcardLike')" class="text-xs px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 hover:border-slate-600 transition flex items-center gap-1.5">
+          <span>Leading Wildcard LIKE</span>
+        </button>
+        <button onclick="loadPreset('redundantDistinct')" class="text-xs px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 hover:border-slate-600 transition flex items-center gap-1.5">
+          <span>Redundant DISTINCT</span>
+        </button>
+        <button onclick="loadPreset('multiJoin')" class="text-xs px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 hover:border-slate-600 transition flex items-center gap-1.5">
+          <span>Multi-Table Aggregation</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- WORKBENCH GRID: 2 COLUMNS -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1">
+
+      <!-- LEFT: QUERY INPUT & CONTROLS (5 COLS) -->
+      <div class="lg:col-span-6 flex flex-col gap-4">
+        
+        <!-- SQL Input Box -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col flex-1 shadow-sm">
+          <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+            <div class="flex items-center space-x-2">
+              <i data-lucide="code" class="w-4 h-4 text-cyan-400"></i>
+              <span class="text-xs font-semibold uppercase tracking-wider text-slate-300">Input SQL Query</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <button onclick="formatInputQuery()" title="Format / Prettify SQL" class="text-xs px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition flex items-center gap-1">
+                <i data-lucide="align-left" class="w-3.5 h-3.5"></i>
+                <span>Format</span>
+              </button>
+              <button onclick="clearQuery()" title="Clear editor" class="text-xs px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition flex items-center gap-1">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                <span>Clear</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="mt-3 flex-1 flex flex-col">
+            <textarea id="sqlInput" rows="9" placeholder="SELECT * FROM orders WHERE customer_id IN (SELECT id FROM customers WHERE status = 'inactive');" class="w-full flex-1 bg-slate-950/70 border border-slate-800 rounded-lg p-3 code-font text-sm text-cyan-200 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 resize-y"></textarea>
+          </div>
+
+          <!-- Optimization Rule / Constraint Input -->
+          <div class="mt-4 pt-3 border-t border-slate-800/80">
+            <label class="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-1.5">
+              <i data-lucide="git-commit" class="w-3.5 h-3.5 text-emerald-400"></i>
+              <span>Optimization Rule / Hint (Optional)</span>
+            </label>
+            <div class="flex gap-2">
+              <input type="text" id="ruleInput" placeholder="e.g. Convert subqueries to JOIN, Use index, Avoid full table scan" class="flex-1 bg-slate-950/70 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-emerald-500">
+              <select onchange="document.getElementById('ruleInput').value = this.value" class="bg-slate-800 border border-slate-700 text-slate-300 text-xs rounded-lg px-2 py-2">
+                <option value="">Rules...</option>
+                <option value="Convert subqueries to JOIN">Convert subquery to JOIN</option>
+                <option value="Push filtering predicates into subqueries">Push filter down</option>
+                <option value="Ensure covering index on filter columns">Use covering index</option>
+                <option value="Avoid leading wildcard in LIKE">Avoid leading wildcard</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Optimizer Engine Selector -->
+          <div class="mt-4 pt-3 border-t border-slate-800/80">
+            <label class="block text-xs font-semibold text-slate-300 mb-2 flex items-center gap-1.5">
+              <i data-lucide="cpu" class="w-3.5 h-3.5 text-indigo-400"></i>
+              <span>Execution Engine</span>
+            </label>
+            <div class="grid grid-cols-3 gap-2">
+              <label class="flex flex-col items-center p-2 rounded-lg border border-cyan-500/40 bg-cyan-950/20 cursor-pointer hover:bg-cyan-950/30 transition text-center" id="modeCardHybrid">
+                <input type="radio" name="engineMode" value="hybrid" checked class="hidden" onchange="updateModeUI()">
+                <i data-lucide="zap" class="w-4 h-4 text-cyan-400 mb-1"></i>
+                <span class="text-xs font-semibold text-cyan-300">Hybrid</span>
+                <span class="text-[10px] text-slate-400">AI + Rules</span>
+              </label>
+
+              <label class="flex flex-col items-center p-2 rounded-lg border border-slate-800 bg-slate-950 cursor-pointer hover:bg-slate-800/50 transition text-center" id="modeCardNeural">
+                <input type="radio" name="engineMode" value="neural" class="hidden" onchange="updateModeUI()">
+                <i data-lucide="bot" class="w-4 h-4 text-indigo-400 mb-1"></i>
+                <span class="text-xs font-semibold text-slate-300">Transformer</span>
+                <span class="text-[10px] text-slate-400">Neural GPT</span>
+              </label>
+
+              <label class="flex flex-col items-center p-2 rounded-lg border border-slate-800 bg-slate-950 cursor-pointer hover:bg-slate-800/50 transition text-center" id="modeCardRules">
+                <input type="radio" name="engineMode" value="rules" class="hidden" onchange="updateModeUI()">
+                <i data-lucide="shield-check" class="w-4 h-4 text-emerald-400 mb-1"></i>
+                <span class="text-xs font-semibold text-slate-300">Rule Engine</span>
+                <span class="text-[10px] text-slate-400">Deterministic</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Primary Submit Action -->
+          <div class="mt-5">
+            <button id="optimizeBtn" onclick="runOptimization()" class="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-cyan-500 via-indigo-600 to-purple-600 hover:from-cyan-400 hover:to-purple-500 text-white font-semibold text-sm shadow-lg shadow-indigo-600/20 flex items-center justify-center space-x-2 transition transform active:scale-[0.99]">
+              <i data-lucide="wand-2" class="w-4 h-4" id="btnIcon"></i>
+              <span id="btnText">Optimize Query</span>
+              <span class="text-[11px] opacity-70 ml-2 px-1.5 py-0.5 rounded bg-black/20">Ctrl + Enter</span>
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- RIGHT: RESULTS & ANALYSIS WORKBENCH (7 COLS) -->
+      <div class="lg:col-span-6 flex flex-col gap-4">
+        
+        <!-- Output Card -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col flex-1 shadow-sm">
+          
+          <!-- Tab Navigation & Status Badge -->
+          <div class="flex flex-wrap items-center justify-between pb-3 border-b border-slate-800 gap-2">
+            <div class="flex space-x-1 bg-slate-950 p-1 rounded-lg border border-slate-800 text-xs">
+              <button onclick="switchTab('tabSql')" id="tabBtnSql" class="px-3 py-1.5 rounded-md font-medium text-white bg-slate-800 shadow transition flex items-center gap-1.5">
+                <i data-lucide="terminal" class="w-3.5 h-3.5 text-cyan-400"></i>
+                <span>Optimized SQL</span>
+              </button>
+              <button onclick="switchTab('tabExplain')" id="tabBtnExplain" class="px-3 py-1.5 rounded-md font-medium text-slate-400 hover:text-slate-200 transition flex items-center gap-1.5">
+                <i data-lucide="file-text" class="w-3.5 h-3.5 text-emerald-400"></i>
+                <span>Analysis</span>
+              </button>
+              <button onclick="switchTab('tabTokens')" id="tabBtnTokens" class="px-3 py-1.5 rounded-md font-medium text-slate-400 hover:text-slate-200 transition flex items-center gap-1.5">
+                <i data-lucide="binary" class="w-3.5 h-3.5 text-indigo-400"></i>
+                <span>Tokenizer</span>
+              </button>
+              <button onclick="switchTab('tabModel')" id="tabBtnModel" class="px-3 py-1.5 rounded-md font-medium text-slate-400 hover:text-slate-200 transition flex items-center gap-1.5">
+                <i data-lucide="cpu" class="w-3.5 h-3.5 text-purple-400"></i>
+                <span>Model</span>
+              </button>
+            </div>
+
+            <!-- Execution Time & Risk Badge -->
+            <div class="flex items-center gap-2" id="metricBadges" style="display: none;">
+              <span id="riskBadge" class="text-[11px] font-semibold px-2 py-0.5 rounded-full border">LOW RISK</span>
+              <span id="timeBadge" class="text-[11px] px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">0ms</span>
+            </div>
+          </div>
+
+          <!-- TAB 1: OPTIMIZED SQL -->
+          <div id="tabSql" class="mt-3 flex-1 flex flex-col">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs text-slate-400 flex items-center gap-1">
+                <i data-lucide="sparkles" class="w-3.5 h-3.5 text-cyan-400"></i>
+                <span id="outputEngineNote">Recommended query structure</span>
+              </span>
+              <button onclick="copyOptimizedSql()" class="text-xs px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition flex items-center gap-1 border border-slate-700">
+                <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                <span id="copyBtnText">Copy SQL</span>
+              </button>
+            </div>
+
+            <div class="flex-1 bg-slate-950 border border-slate-800 rounded-lg p-1 overflow-auto max-h-[460px] min-h-[220px]">
+              <pre><code id="optimizedSqlCode" class="language-sql hljs">-- Click "Optimize Query" to see recommended execution plan and rewrite.</code></pre>
+            </div>
+          </div>
+
+          <!-- TAB 2: EXPLANATIONS & PERFORMANCE TIPS -->
+          <div id="tabExplain" class="mt-3 flex-1 flex flex-col hidden space-y-4 max-h-[460px] overflow-y-auto pr-1">
+            <!-- Applied Rules -->
+            <div class="bg-slate-950/60 border border-slate-800 rounded-lg p-3">
+              <h3 class="text-xs font-semibold text-cyan-300 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400"></i>
+                <span>Transformations Applied</span>
+              </h3>
+              <ul id="rulesList" class="space-y-1.5 text-xs text-slate-300">
+                <li class="text-slate-500 italic">No query processed yet.</li>
+              </ul>
+            </div>
+
+            <!-- Detailed Explanations -->
+            <div class="bg-slate-950/60 border border-slate-800 rounded-lg p-3">
+              <h3 class="text-xs font-semibold text-amber-300 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                <i data-lucide="lightbulb" class="w-4 h-4 text-amber-400"></i>
+                <span>Database Index & Execution Analysis</span>
+              </h3>
+              <ul id="explanationsList" class="space-y-2 text-xs text-slate-300">
+                <li class="text-slate-500 italic">Run an optimization to view deep performance tips.</li>
+              </ul>
+            </div>
+
+            <!-- Performance Best Practices -->
+            <div class="bg-slate-950/60 border border-slate-800 rounded-lg p-3" id="tipsContainer">
+              <h3 class="text-xs font-semibold text-purple-300 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                <i data-lucide="shield-alert" class="w-4 h-4 text-purple-400"></i>
+                <span>Production Database Guidance</span>
+              </h3>
+              <ul id="tipsList" class="space-y-1.5 text-xs text-slate-300">
+                <li class="text-slate-400">• Check EXPLAIN ANALYZE on actual execution for exact cost metrics.</li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- TAB 3: TOKENIZER INSPECTOR -->
+          <div id="tabTokens" class="mt-3 flex-1 flex flex-col hidden max-h-[460px] overflow-y-auto pr-1">
+            <div class="bg-slate-950/70 border border-slate-800 rounded-lg p-3 mb-3">
+              <div class="flex items-center justify-between text-xs mb-2">
+                <span class="text-slate-300 font-semibold flex items-center gap-1.5">
+                  <i data-lucide="binary" class="w-4 h-4 text-indigo-400"></i>
+                  <span>SentencePiece Decomposition (Query_Tokenizer.model)</span>
+                </span>
+                <span class="text-slate-400">Total Tokens: <strong id="tokenCountLabel" class="text-cyan-400">0</strong></span>
+              </div>
+              <p class="text-[11px] text-slate-400 mb-3">
+                This shows how the custom tokenizer trained on the SQL dataset breaks the query into discrete sub-word vocab IDs (Vocab size: 375).
+              </p>
+              
+              <!-- Token Pills Container -->
+              <div id="tokenPillsContainer" class="flex flex-wrap gap-1.5 p-2 bg-slate-900 rounded-lg border border-slate-800 min-h-[120px] items-start">
+                <span class="text-xs text-slate-500 italic p-2">Tokens will appear here once query is analyzed...</span>
+              </div>
+            </div>
+
+            <!-- Token ID Table -->
+            <div class="bg-slate-950/70 border border-slate-800 rounded-lg p-3">
+              <h4 class="text-xs font-semibold text-slate-300 mb-2">Token Sequence Mapping</h4>
+              <div class="overflow-x-auto max-h-[160px]">
+                <table class="w-full text-left text-xs">
+                  <thead class="text-slate-400 border-b border-slate-800">
+                    <tr>
+                      <th class="py-1 px-2">Index</th>
+                      <th class="py-1 px-2">Subword Piece</th>
+                      <th class="py-1 px-2">Vocab ID</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tokenTableBody" class="divide-y divide-slate-800/60 font-mono text-[11px]">
+                    <tr><td colspan="3" class="py-2 px-2 text-slate-500 italic">No tokens available.</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB 4: MODEL ARCHITECTURE INFO -->
+          <div id="tabModel" class="mt-3 flex-1 flex flex-col hidden max-h-[460px] overflow-y-auto pr-1">
+            <div class="bg-slate-950/80 border border-slate-800 rounded-lg p-4 space-y-4">
+              <div>
+                <h3 class="text-xs font-semibold text-white uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                  <i data-lucide="cpu" class="w-4 h-4 text-purple-400"></i>
+                  <span>PyTorch Neural Network Architecture</span>
+                </h3>
+                <p class="text-[11px] text-slate-400">
+                  Custom decoder-only autoregressive transformer model defined in <code class="text-cyan-300">model (1).ipynb</code> and running in Flask.
+                </p>
+              </div>
+
+              <!-- Parameter Specs Grid -->
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                <div class="bg-slate-900 p-2.5 rounded-lg border border-slate-800">
+                  <span class="text-slate-400 text-[10px] block">Layers (Stack)</span>
+                  <span class="font-bold text-cyan-400 text-sm">6 Decoders</span>
+                </div>
+                <div class="bg-slate-900 p-2.5 rounded-lg border border-slate-800">
+                  <span class="text-slate-400 text-[10px] block">Attention Heads</span>
+                  <span class="font-bold text-indigo-400 text-sm">4 Heads</span>
+                </div>
+                <div class="bg-slate-900 p-2.5 rounded-lg border border-slate-800">
+                  <span class="text-slate-400 text-[10px] block">Embedding Dim (d_model)</span>
+                  <span class="font-bold text-emerald-400 text-sm">256</span>
+                </div>
+                <div class="bg-slate-900 p-2.5 rounded-lg border border-slate-800">
+                  <span class="text-slate-400 text-[10px] block">FFN Dim (d_ff)</span>
+                  <span class="font-bold text-amber-400 text-sm">1024</span>
+                </div>
+                <div class="bg-slate-900 p-2.5 rounded-lg border border-slate-800">
+                  <span class="text-slate-400 text-[10px] block">Vocabulary Size</span>
+                  <span class="font-bold text-pink-400 text-sm">375 tokens</span>
+                </div>
+                <div class="bg-slate-900 p-2.5 rounded-lg border border-slate-800">
+                  <span class="text-slate-400 text-[10px] block">Total Parameters</span>
+                  <span class="font-bold text-white text-sm">4,934,007</span>
+                </div>
+                <div class="bg-slate-900 p-2.5 rounded-lg border border-slate-800">
+                  <span class="text-slate-400 text-[10px] block">Max Seq Length</span>
+                  <span class="font-bold text-cyan-300 text-sm">140 tokens</span>
+                </div>
+                <div class="bg-slate-900 p-2.5 rounded-lg border border-slate-800">
+                  <span class="text-slate-400 text-[10px] block">Causal Masking</span>
+                  <span class="font-bold text-emerald-300 text-sm">Triangular Mask</span>
+                </div>
+              </div>
+
+              <!-- Pipeline Flowchart -->
+              <div class="bg-slate-900/90 p-3 rounded-lg border border-slate-800 text-xs">
+                <span class="font-semibold text-slate-300 block mb-2">Tensor Processing Pipeline</span>
+                <div class="space-y-1 text-slate-300 code-font text-[11px]">
+                  <div class="flex items-center gap-2">
+                    <span class="px-2 py-0.5 rounded bg-slate-800 text-cyan-300">Input Tokens</span>
+                    <span>&rarr;</span>
+                    <span class="px-2 py-0.5 rounded bg-slate-800 text-emerald-300">Embedding * sqrt(256) + Sinusoidal PE</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span class="text-slate-500 ml-4">&darr;</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span class="px-2 py-0.5 rounded bg-slate-800 text-indigo-300">6x [LayerNorm &rarr; Masked MHA &rarr; Residual &rarr; LayerNorm &rarr; FFN (SiLU) &rarr; Residual]</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span class="text-slate-500 ml-4">&darr;</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span class="px-2 py-0.5 rounded bg-slate-800 text-purple-300">Linear Projection(256 &rarr; 375) &rarr; Softmax Next Token Logits</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- TOAST NOTIFICATION -->
+  <div id="toast" class="fixed bottom-5 right-5 bg-slate-800 border border-slate-700 text-white px-4 py-2.5 rounded-xl shadow-2xl text-xs flex items-center space-x-2 transition-all duration-300 transform translate-y-12 opacity-0 pointer-events-none z-50">
+    <i data-lucide="check-circle" class="w-4 h-4 text-emerald-400"></i>
+    <span id="toastMsg">Action complete</span>
+  </div>
+
+  <!-- SCRIPT -->
+  <script>
+    // Initialize Lucide Icons
+    lucide.createIcons();
+
+    // Presets catalog
+    const PRESETS = {
+      subquery: {
+        sql: "SELECT customer_name, total_orders FROM customers WHERE customer_id IN (SELECT customer_id FROM orders WHERE order_status = 'completed' AND order_date >= '2026-01-01');",
+        rule: "Convert subqueries to JOIN for optimal B-tree index lookup"
+      },
+      selectStar: {
+        sql: "SELECT * FROM sales_transactions JOIN employees ON sales_transactions.emp_id = employees.id;",
+        rule: "Avoid SELECT * to enable index-only covering scans"
+      },
+      wildcardLike: {
+        sql: "SELECT employee_id, first_name, last_name, salary FROM employees WHERE last_name LIKE '%son' ORDER BY salary DESC;",
+        rule: "Avoid leading wildcard in LIKE to enable index scans"
+      },
+      redundantDistinct: {
+        sql: "SELECT DISTINCT department_id, COUNT(id) FROM employees GROUP BY department_id;",
+        rule: "Eliminate redundant DISTINCT when GROUP BY is present"
+      },
+      multiJoin: {
+        sql: "SELECT products.name, SUM(order_items.quantity) FROM products JOIN order_items ON products.id = order_items.product_id WHERE products.category = 'Electronics' GROUP BY products.name;",
+        rule: "Push filtering predicates into subqueries before aggregation"
+      }
+    };
+
+    function loadPreset(key) {
+      if (PRESETS[key]) {
+        document.getElementById('sqlInput').value = PRESETS[key].sql;
+        document.getElementById('ruleInput').value = PRESETS[key].rule;
+        showToast("Preset loaded into editor!");
+      }
+    }
+
+    function clearQuery() {
+      document.getElementById('sqlInput').value = '';
+      document.getElementById('ruleInput').value = '';
+    }
+
+    function switchTab(tabId) {
+      const tabs = ['tabSql', 'tabExplain', 'tabTokens', 'tabModel'];
+      const btns = {
+        tabSql: 'tabBtnSql',
+        tabExplain: 'tabBtnExplain',
+        tabTokens: 'tabBtnTokens',
+        tabModel: 'tabBtnModel'
+      };
+
+      tabs.forEach(t => {
+        document.getElementById(t).classList.add('hidden');
+        document.getElementById(btns[t]).classList.remove('text-white', 'bg-slate-800', 'shadow');
+        document.getElementById(btns[t]).classList.add('text-slate-400');
+      });
+
+      document.getElementById(tabId).classList.remove('hidden');
+      document.getElementById(btns[tabId]).classList.remove('text-slate-400');
+      document.getElementById(btns[tabId]).classList.add('text-white', 'bg-slate-800', 'shadow');
+    }
+
+    function updateModeUI() {
+      const selected = document.querySelector('input[name="engineMode"]:checked').value;
+      const hybridCard = document.getElementById('modeCardHybrid');
+      const neuralCard = document.getElementById('modeCardNeural');
+      const rulesCard = document.getElementById('modeCardRules');
+
+      // Reset
+      [hybridCard, neuralCard, rulesCard].forEach(c => {
+        c.className = "flex flex-col items-center p-2 rounded-lg border border-slate-800 bg-slate-950 cursor-pointer hover:bg-slate-800/50 transition text-center";
+      });
+
+      if (selected === 'hybrid') {
+        hybridCard.className = "flex flex-col items-center p-2 rounded-lg border border-cyan-500/40 bg-cyan-950/20 cursor-pointer hover:bg-cyan-950/30 transition text-center";
+      } else if (selected === 'neural') {
+        neuralCard.className = "flex flex-col items-center p-2 rounded-lg border border-indigo-500/40 bg-indigo-950/20 cursor-pointer hover:bg-indigo-950/30 transition text-center";
+      } else {
+        rulesCard.className = "flex flex-col items-center p-2 rounded-lg border border-emerald-500/40 bg-emerald-950/20 cursor-pointer hover:bg-emerald-950/30 transition text-center";
+      }
+    }
+
+    async function formatInputQuery() {
+      const query = document.getElementById('sqlInput').value.trim();
+      if (!query) return;
+
+      try {
+        const res = await fetch('/api/format', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({query})
+        });
+        const data = await res.json();
+        if (data.formatted_query) {
+          document.getElementById('sqlInput').value = data.formatted_query;
+          showToast("Query formatted!");
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    async function runOptimization() {
+      const query = document.getElementById('sqlInput').value.trim();
+      if (!query) {
+        showToast("Please enter an SQL query first");
+        return;
+      }
+
+      const rule = document.getElementById('ruleInput').value.trim();
+      const mode = document.querySelector('input[name="engineMode"]:checked').value;
+
+      const btn = document.getElementById('optimizeBtn');
+      const btnText = document.getElementById('btnText');
+      const btnIcon = document.getElementById('btnIcon');
+
+      // Loading state
+      btn.disabled = true;
+      btnText.innerText = "Optimizing...";
+      btnIcon.setAttribute('data-lucide', 'loader-2');
+      btnIcon.classList.add('animate-spin');
+      lucide.createIcons();
+
+      try {
+        const response = await fetch('/api/optimize', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            query: query,
+            rule: rule,
+            mode: mode
+          })
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          showToast(data.error || "Optimization failed");
+          return;
+        }
+
+        renderResults(data);
+        showToast("Query optimized successfully!");
+
+      } catch (err) {
+        console.error(err);
+        showToast("Network error communicating with server");
+      } finally {
+        btn.disabled = false;
+        btnText.innerText = "Optimize Query";
+        btnIcon.setAttribute('data-lucide', 'wand-2');
+        btnIcon.classList.remove('animate-spin');
+        lucide.createIcons();
+      }
+    }
+
+    function renderResults(data) {
+      // 1. Optimized SQL
+      const codeBlock = document.getElementById('optimizedSqlCode');
+      codeBlock.textContent = data.optimized_query || data.formatted_query || "";
+      hljs.highlightElement(codeBlock);
+
+      // Note badge
+      document.getElementById('outputEngineNote').innerText = data.model_note || "Optimized execution structure";
+
+      // 2. Metrics & risk
+      document.getElementById('metricBadges').style.display = 'flex';
+      document.getElementById('timeBadge').innerText = `${data.elapsed_ms}ms`;
+
+      const riskBadge = document.getElementById('riskBadge');
+      if (data.risk_level === 'HIGH') {
+        riskBadge.innerText = 'HIGH RISK';
+        riskBadge.className = 'text-[11px] font-semibold px-2 py-0.5 rounded-full border border-rose-500/40 bg-rose-950/40 text-rose-400';
+      } else if (data.risk_level === 'MEDIUM') {
+        riskBadge.innerText = 'MEDIUM RISK';
+        riskBadge.className = 'text-[11px] font-semibold px-2 py-0.5 rounded-full border border-amber-500/40 bg-amber-950/40 text-amber-400';
+      } else {
+        riskBadge.innerText = 'LOW RISK';
+        riskBadge.className = 'text-[11px] font-semibold px-2 py-0.5 rounded-full border border-emerald-500/40 bg-emerald-950/40 text-emerald-400';
+      }
+
+      // 3. Tab 2 Explanations
+      const rulesList = document.getElementById('rulesList');
+      rulesList.innerHTML = '';
+      if (data.rules_applied && data.rules_applied.length > 0) {
+        data.rules_applied.forEach(r => {
+          const li = document.createElement('li');
+          li.className = 'flex items-center gap-1.5 text-cyan-300';
+          li.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-cyan-400"></span><span>Rule: <strong>${r}</strong></span>`;
+          rulesList.appendChild(li);
+        });
+      } else {
+        rulesList.innerHTML = '<li class="text-slate-400">• Standard SQL structure; formatting & keywords standardized.</li>';
+      }
+
+      const explanationsList = document.getElementById('explanationsList');
+      explanationsList.innerHTML = '';
+      if (data.explanations && data.explanations.length > 0) {
+        data.explanations.forEach(exp => {
+          const li = document.createElement('li');
+          li.className = 'text-slate-300 leading-relaxed';
+          li.innerHTML = `• ${exp}`;
+          explanationsList.appendChild(li);
+        });
+      }
+
+      const tipsList = document.getElementById('tipsList');
+      tipsList.innerHTML = '';
+      if (data.tips && data.tips.length > 0) {
+        data.tips.forEach(t => {
+          const li = document.createElement('li');
+          li.className = 'text-slate-300';
+          li.innerHTML = `• ${t}`;
+          tipsList.appendChild(li);
+        });
+      } else {
+        tipsList.innerHTML = '<li class="text-slate-400">• Monitor query performance metrics in production execution plan.</li>';
+      }
+
+      // 4. Tab 3 Tokenizer Inspection
+      const tokenPillsContainer = document.getElementById('tokenPillsContainer');
+      const tokenTableBody = document.getElementById('tokenTableBody');
+      const tokenCountLabel = document.getElementById('tokenCountLabel');
+
+      tokenCountLabel.innerText = data.token_count || 0;
+      tokenPillsContainer.innerHTML = '';
+      tokenTableBody.innerHTML = '';
+
+      if (data.tokens && data.tokens.length > 0) {
+        const colors = [
+          'bg-cyan-950 text-cyan-300 border-cyan-800',
+          'bg-indigo-950 text-indigo-300 border-indigo-800',
+          'bg-purple-950 text-purple-300 border-purple-800',
+          'bg-emerald-950 text-emerald-300 border-emerald-800',
+          'bg-amber-950 text-amber-300 border-amber-800'
+        ];
+
+        data.tokens.forEach((tok, idx) => {
+          const id = data.token_ids[idx];
+          const colorClass = colors[idx % colors.length];
+
+          // Pill
+          const pill = document.createElement('span');
+          pill.className = `px-2 py-1 rounded text-xs font-mono border ${colorClass} inline-flex items-center gap-1.5 shadow-sm`;
+          pill.innerHTML = `<span>${escapeHtml(tok)}</span><span class="text-[9px] opacity-60 font-sans">#${id}</span>`;
+          tokenPillsContainer.appendChild(pill);
+
+          // Table row
+          const tr = document.createElement('tr');
+          tr.className = 'hover:bg-slate-900/60';
+          tr.innerHTML = `
+            <td class="py-1 px-2 text-slate-500">${idx}</td>
+            <td class="py-1 px-2 text-slate-200">${escapeHtml(tok)}</td>
+            <td class="py-1 px-2 text-cyan-400 font-bold">${id}</td>
+          `;
+          tokenTableBody.appendChild(tr);
+        });
+      } else {
+        tokenPillsContainer.innerHTML = '<span class="text-xs text-slate-500 italic">No tokens found.</span>';
+      }
+
+      lucide.createIcons();
+    }
+
+    function escapeHtml(str) {
+      return str
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    function copyOptimizedSql() {
+      const code = document.getElementById('optimizedSqlCode').textContent;
+      if (!code) return;
+      navigator.clipboard.writeText(code).then(() => {
+        showToast("Optimized SQL copied to clipboard!");
+      });
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      const toastMsg = document.getElementById('toastMsg');
+      toastMsg.innerText = msg;
+      toast.classList.remove('translate-y-12', 'opacity-0', 'pointer-events-none');
+      setTimeout(() => {
+        toast.classList.add('translate-y-12', 'opacity-0', 'pointer-events-none');
+      }, 3000);
+    }
+
+    // Keyboard shortcut: Ctrl + Enter to optimize
+    document.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        runOptimization();
+      }
+    });
+
+    // Fetch initial model metadata on page load
+    async function loadModelMeta() {
+      try {
+        const res = await fetch('/api/model-info');
+        const info = await res.json();
+        if (info.architecture) {
+          document.getElementById('badgeParams').innerText = (info.total_parameters / 1e6).toFixed(1) + 'M';
+          document.getElementById('badgeVocab').innerText = `${info.vocab_size} SP`;
+          document.getElementById('badgeEngine').innerText = `${info.layers}L Decoder`;
+        }
+      } catch (err) {
+        console.error("Could not fetch model info:", err);
+      }
+    }
+
+    loadModelMeta();
+    // Pre-populate with first preset
+    loadPreset('subquery');
+  </script>
+</body>
+</html>
